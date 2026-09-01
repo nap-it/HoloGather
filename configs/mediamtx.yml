@@ -1,0 +1,51 @@
+# Control / observability
+api: no
+
+metrics: no
+
+# Ingest protocols
+rtsp: yes
+rtspAddress: 127.0.0.1:8554
+rtspEncryption: "no"
+# The example publisher explicitly uses RTSP-over-TCP; disabling UDP also
+# avoids opening the default RTP/RTCP ports on the host.
+rtspTransports: [tcp]
+
+rtmp: no
+
+webrtc: yes
+webrtcAddress: 127.0.0.1:8889
+webrtcLocalUDPAddress: 127.0.0.1:8189
+webrtcIPsFromInterfaces: no
+webrtcAdditionalHosts: [127.0.0.1]
+
+srt: no
+
+# Media-over-QUIC is not used by these examples.
+moq: no
+
+# Optional local playback outputs only if you really use them here
+hls: no
+# hls: yes
+# hlsAddress: :8888
+# hlsEncryption: no
+# hlsAllowOrigins: ["*"]
+# hlsSegmentCount: 3
+# hlsSegmentDuration: 1s
+# hlsPartDuration: 200ms
+# hlsVariant: lowLatency
+
+# Subscribers push RTSP directly to MediaMTX (PyAV RTSP publish).
+# No source: needed — MediaMTX creates paths on demand when a publisher connects.
+paths:
+  pv_camera: {}
+
+  depth_camera: {}
+
+  vlc_camera_leftleft: {}
+
+  vlc_camera_leftfront: {}
+
+  vlc_camera_rightfront: {}
+
+  vlc_camera_rightright: {}

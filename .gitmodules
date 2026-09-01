@@ -1,0 +1,4 @@
+[submodule "libs/hololens_sensor_streaming"]
+	path = libs/hololens_sensor_streaming
+	# Public upstream for the HoloLens packet decoder dependency.
+	url = https://github.com/jdibenes/hl2ss.git
