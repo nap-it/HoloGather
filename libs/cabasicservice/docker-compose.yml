@@ -1,0 +1,21 @@
+services:
+  basicservice:
+    container_name: basicservice
+    image: ${CABASICSERVICE_IMAGE:-cabasicservice:dev}
+    environment:
+      - CORRUPTION_PROTECTION=true
+    volumes:
+      - ./config.ini:/config.ini
+      - ./logs:/logs
+    network_mode: host
+
+  gpsadapter:
+    container_name: gpsadapter
+    image: ${GPSADAPTER_IMAGE:-gpsadapter:dev}
+    environment:
+      - CORRUPTION_PROTECTION=true
+    volumes:
+      - ./adapters/gpsadapter/config.ini:/config.ini
+    network_mode: host
+    depends_on:
+      - basicservice

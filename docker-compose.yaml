@@ -1,0 +1,30 @@
+services:
+  hololens_publisher:
+    image: hololens_publisher:latest
+    build: .
+    container_name: hololens_publisher
+    entrypoint: ["./scripts/publisher-start.sh"]
+    shm_size: 512m
+    ulimits:
+      memlock:
+        soft: 268435456
+        hard: 268435456
+      nofile:
+        soft: 65536
+        hard: 65536
+    cap_add:
+      - IPC_LOCK
+    # IPC_LOCK is sufficient for the configured shared-memory path. Add only
+    # narrowly scoped device/capability access if a deployment needs it.
+    network_mode: host
+    volumes:
+      - ./src:/root/app/src
+      - ./libs:/root/app/libs
+      - ./configs:/root/app/configs
+      - ./scripts:/root/app/scripts
+      - ${host_dir:-./recordings}:/root/app/recordings
+    environment:
+      - SETTINGS_DATA_DIR=${SETTINGS_DATA_DIR:-/root/app/recordings}
+      - SETTINGS_MODE=${SETTINGS_MODE:-live}
+      - ZENOH_ENABLED=${ZENOH_ENABLED:-true}
+      - ZENOH_USE_SHM=${ZENOH_USE_SHM:-false}
