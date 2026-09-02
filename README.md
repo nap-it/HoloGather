@@ -17,11 +17,13 @@ The two `hl2ss` paths intentionally point to the same pinned upstream revision. 
 
 If you find this code useful in your research, please consider citing:
 
+```bibtex
 @INPROCEEDINGS{Silva2026,
     author={Gonçalo Silva and Rodrigo Abreu and André Clérigo and Pedro Rito and Susana Sargento},
     booktitle={2026 IEEE International Symposium on Wireless Personal Multimedia Communications (WPMC)},
     title={HoloGather: A Multimodal Edge-based Acquisition Framework for Wearable Perception Data}
 }
+```
 
 ## Supported data
 
