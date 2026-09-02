@@ -13,6 +13,16 @@ HoloGather is an end-to-end toolkit for gathering, recording, replaying, and con
 
 The two `hl2ss` paths intentionally point to the same pinned upstream revision. Keeping one checkout inside each application preserves its standalone Docker build context and avoids coupling either image to files outside its directory.
 
+## Citation
+
+If you find this code useful in your research, please consider citing:
+
+@INPROCEEDINGS{Silva2026,
+    author={Gonçalo Silva and Rodrigo Abreu and André Clérigo and Pedro Rito and Susana Sargento},
+    booktitle={2026 IEEE International Symposium on Wireless Personal Multimedia Communications (WPMC)},
+    title={HoloGather: A Multimodal Edge-based Acquisition Framework for Wearable Perception Data}
+}
+
 ## Supported data
 
 - HoloLens personal video (RGB), long-throw or AHAT depth, and microphone.
@@ -113,4 +123,3 @@ To stop either stack, run `docker compose down` from its application directory.
 
 Only outputs for enabled subscribers are started. See the [subscriber configuration guide](subscriber-examples/docs/configurations.md)
 and [topic/packet contract](subscriber-examples/docs/topic-packet-contract.md) for the complete mapping.
-
