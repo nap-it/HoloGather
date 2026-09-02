@@ -140,7 +140,8 @@ location, pose, and calibration streams can all contain sensitive data; never
 publish recordings, packet captures, or runtime logs without a separate privacy
 review.
 
-`libs/hololens_sensor_streaming` is a git submodule pointing at the public
+`libs/hololens_sensor_streaming` is an app-local git submodule declared in the
+HoloGather root `.gitmodules` file. It points at the public
 [`hl2ss`](https://github.com/jdibenes/hl2ss) project and is pinned to a public
 upstream revision. Its license includes a Commons Clause restriction; review
 and preserve its terms because it is a separate dependency. The optional

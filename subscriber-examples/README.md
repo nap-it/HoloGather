@@ -78,8 +78,10 @@ RTSP, which re-exposes each stream as RTSP / WebRTC / HLS.
 
 ## Dependencies and privacy
 
-The `libs/hololens_sensor_streaming` git submodule supplies the project's
-`hl2ss` decoder and is pinned to a public upstream revision. Initialize it with:
+The `libs/hololens_sensor_streaming` app-local git submodule is declared in the
+HoloGather root `.gitmodules` file. It supplies the `hl2ss` decoder and is
+pinned to a public upstream revision. From the HoloGather root, initialize both
+app dependencies with:
 
 ```bash
 git submodule update --init --recursive

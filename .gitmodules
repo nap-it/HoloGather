@@ -1,0 +1,6 @@
+[submodule "publisher/hl2ss"]
+	path = publisher/libs/hololens_sensor_streaming
+	url = https://github.com/jdibenes/hl2ss.git
+[submodule "subscriber-examples/hl2ss"]
+	path = subscriber-examples/libs/hololens_sensor_streaming
+	url = https://github.com/jdibenes/hl2ss.git
