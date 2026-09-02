@@ -1,0 +1,11 @@
+class SensorType:
+    PV             = "PV"
+    DEPTH          = "DEPTH"
+    VLC            = "VLC"
+    IMU            = "IMU"
+    MICROPHONE     = "MIC"
+    SPATIAL_INPUT  = "SI"
+    EYE_TRACKING   = "EET"
+    DEPTH_CORRELATED = "DCORR"
+    GPS            = "GPS"
+    HEADING        = "HDG"

@@ -1,0 +1,35 @@
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:1.20.1
+    container_name: mediamtx
+    network_mode: host
+    environment:
+      - MTX_LOGLEVEL=info
+    volumes:
+      - ./configs/mediamtx.yml:/mediamtx.yml:ro
+    restart: unless-stopped
+
+  hololens_subscriber:
+    image: hololens_subscribers:latest
+    build: .
+    container_name: hololens_subscriber
+    entrypoint: ["./scripts/subscriber-start.sh"]
+    depends_on:
+      - mediamtx
+    shm_size: 512m
+    ulimits:
+      memlock:
+        soft: 268435456
+        hard: 268435456
+      nofile:
+        soft: 65536
+        hard: 65536
+    cap_add:
+      - IPC_LOCK
+    # IPC_LOCK is sufficient for Zenoh shared-memory use; avoid privileged
+    # mode so the example container does not receive unrelated host access.
+    network_mode: host
+    volumes:
+      - ./src:/root/app/src
+      - ./configs:/root/app/configs
+      - ./scripts:/root/app/scripts

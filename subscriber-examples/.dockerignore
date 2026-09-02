@@ -1,0 +1,29 @@
+# Keep repository metadata, local environments, and runtime data out of the
+# Docker build context. The checked-in source/configs/scripts are copied by the
+# Dockerfile explicitly.
+.git
+.gitmodules
+.venv
+venv
+env
+__pycache__
+*.py[cod]
+*.log
+*.pcap
+*.pcapng
+*.sqlite
+*.sqlite3
+*.db
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+.env
+.env.*
+recordings
+dataset
+calibration
+sensors/temp
+sensors/dataset
