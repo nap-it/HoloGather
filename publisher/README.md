@@ -1,33 +1,16 @@
 # HoloLens Publisher
 
-Captures the SafeXCity mobile sensor streams: HoloLens 2 (RGB / depth / audio /
-IMU via `hl2ss`) plus MQTT-delivered GPS and heading. It wraps each sample in a
-canonical **`SensorEnvelope`**, and **records** it to disk and/or **publishes** it
-to **Zenoh** for live consumers. It also **replays** recordings back onto Zenoh in
-real time (simulation mode).
-
-Part of the **SafeXCity** project. Author: **Rodrigo Abreu**.
+Captures the mobile sensor streams: HoloLens 2 (RGB / depth / audio / IMU via `hl2ss`) plus MQTT-delivered GPS and heading. It wraps each sample in a canonical **`SensorEnvelope`**/ **`SensorSample`**, and **records** it to disk and/or **publishes** it to **Zenoh** for live consumers. It also **replays** recordings back onto Zenoh in real time (simulation mode).
 
 ## Architecture
 
-A HoloLens 2 (streaming over `hl2ss`), a USB GPS receiver, and a phone ride with
-the VRU wearer; a backpack **Jetson** runs the apps. GPS (NMEA→MQTT via
-`gpsadapter`), the ETSI VAM generator (`basicservice`), phone location, and the
-HoloLens heading/IMU all reach an on-device **MQTT broker**, while the HoloLens
-video/audio streams arrive over TCP/Wi‑Fi. This publisher fans everything in,
-wraps each sample in a canonical **`SensorEnvelope`**, and **records** it to
-`.hlp2` files and/or **publishes** it to **Zenoh**.
+A HoloLens 2 (streaming over `hl2ss`), a USB GPS receiver, and a phone ride with the VRU wearer. A backpack **Jetson** runs the apps. GPS (NMEA→MQTT via `gpsadapter`), the ETSI VAM generator (`basicservice`), phone location, and the HoloLens heading/IMU all reach an on-device **MQTT broker**, while the HoloLens video/audio streams arrive over TCP/Wi‑Fi.
 
 ![System architecture](assets/architecture_high_level.png)
 
-Internally the `app` runs one supervised process per stream (plus dedicated
-**health** and **metrics** processes); the HoloLens streamer drives a **sink
-manager** over the `hl2ss` streams/sinks.
+Internally the `app` runs one supervised process per stream (plus dedicated **health** and **metrics** processes). The HoloLens streamer drives a **sink manager** over the `hl2ss` streams/sinks.
 
-Three **modes** select the sinks: **live** (Zenoh only), **record** (also writes
-`.hlp2`), **simulation** (replay recordings). Simulation plays the recorded
-streams back onto Zenoh at real time, all on one shared timeline (see
-[`src/sync`](src/sync)):
+Three **modes** select the sinks: **live** (Zenoh only), **record** (also writes `.hlp2`), **simulation** (replay recordings). Simulation plays the recorded streams back onto Zenoh at real time, all on one shared timeline (see [`src/sync`](src/sync)):
 
 ```mermaid
 flowchart LR
@@ -38,10 +21,7 @@ flowchart LR
 
 ## Sensor streams
 
-The publisher can capture the full HoloLens 2 research sensor set plus external
-GPS/orientation delivered over MQTT. The **SafeXCity dataset runs used the ✓
-streams**; the rest are supported by the pipeline but were not captured in those
-runs.
+The publisher can capture the full HoloLens 2 research sensor set plus external GPS/orientation delivered over MQTT.
 
 ![Dataset sensors](assets/sensor_taxonomy.png)
 
@@ -68,9 +48,7 @@ runs.
 | Unity heading | `Hololens/Heading` | ✓ |
 | Unity IMU — yaw / pitch / roll | `Hololens/UnityIMU` | ✓ |
 
-HoloLens streams are configured per-sensor in `configs/sensors_config.ini`; the
-MQTT streams are handled by the corresponding sensor processes. Note the dataset's
-orientation comes from the **Unity IMU** (MQTT), distinct from the HoloLens **RM
+HoloLens streams are configured per-sensor in `configs/sensors_config.ini`. The MQTT streams are handled by the corresponding sensor processes. Note the dataset's orientation comes from the **Unity IMU** (MQTT), distinct from the HoloLens **RM
 IMU** listed above.
 
 ## Repository layout
@@ -123,28 +101,6 @@ python3 -m src.main --config configs/app_config.ini --sensor-config-file configs
 
 ## Configuration
 
-Config center resolves **file < env < cli**. Sources: `configs/app_config.ini`
-(settings), `configs/sensors_config.ini` (enabled streams).
+Config center resolves **file < env < cli**. Sources: `configs/app_config.ini` (settings), `configs/sensors_config.ini` (enabled streams).
 
-The checked-in INI files contain loopback addresses and empty credentials only.
-Set `HOLOLENS_ADDRESS`, `MQTT_HOST`, `MQTT_USERNAME`, and `MQTT_PASSWORD` (or
-the equivalent CLI options) in your deployment environment; do not commit
-secrets or device addresses. The local Mosquitto example is intentionally bound
-to loopback and permits anonymous access for development. Configure TLS and
-authentication before exposing a broker to another host.
-
-Docker Compose uses host networking. The health and metrics endpoints bind to
-loopback by default and have no authentication; keep them local or add an
-access-controlled proxy if you deliberately expose them. Camera, microphone,
-location, pose, and calibration streams can all contain sensitive data; never
-publish recordings, packet captures, or runtime logs without a separate privacy
-review.
-
-`libs/hololens_sensor_streaming` is an app-local git submodule declared in the
-HoloGather root `.gitmodules` file. It points at the public
-[`hl2ss`](https://github.com/jdibenes/hl2ss) project and is pinned to a public
-upstream revision. Its license includes a Commons Clause restriction; review
-and preserve its terms because it is a separate dependency. The optional
-`cabasicservice` compose files use local image names; set
-`CABASICSERVICE_IMAGE`, `GPSADAPTER_IMAGE`, or `FIXEDPATHADAPTER_IMAGE` to
-compatible images for your deployment.
+The checked-in INI files contain loopback addresses and empty credentials only. To start, set the environment variables `HOLOLENS_ADDRESS`, `MQTT_HOST`, `MQTT_USERNAME`, and `MQTT_PASSWORD` (or the equivalent CLI options) in your deployment environment. The local Mosquitto example is intentionally bound to loopback and permits anonymous access for development.

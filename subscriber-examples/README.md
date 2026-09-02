@@ -1,17 +1,10 @@
 # HoloLens Subscriber Examples
 
-Subscriber-side reference implementations that consume HoloLens sensor streams
-published over **Zenoh** (see the corresponding HoloLens Publisher repository).
-Each stream has a handler that decodes it and re-exposes it in a useful form, for example: 
-video over RTSP, audio over WebSocket, or a live GPS/heading map.
-
-Part of the **SafeXCity** project. Author: **Rodrigo Abreu**.
+Subscriber-side reference implementations that consume HoloLens sensor streams published over **Zenoh**. Each stream has a handler that decodes it and re-exposes it in a useful form, for example:  video over RTSP, audio over WebSocket, or a live GPS/heading map.
 
 ## Architecture
 
-Each handler runs as its own process. Which handlers start is driven by the
-`[sensors]` list in `configs/app_config.ini`; `src/factory.py` maps each name to a
-handler class.
+Each handler runs as its own process. Which handlers start is driven by the `[sensors]` list in `configs/app_config.ini`; `src/factory.py` maps each name to a handler class.
 
 ```mermaid
 flowchart LR
@@ -58,9 +51,7 @@ docker compose up --build                 # first run / after changes
 
 ## Configuration
 
-Enabled subscribers and per-stream settings live in `configs/app_config.ini`
-(`[sensors]` list + one section per stream). See
-[docs/configurations.md](docs/configurations.md).
+Enabled subscribers and per-stream settings live in `configs/app_config.ini` (`[sensors]` list + one section per stream). See [docs/configurations.md](docs/configurations.md).
 
 ## Output endpoints (defaults)
 
@@ -73,33 +64,12 @@ Enabled subscribers and per-stream settings live in `configs/app_config.ini`
 | Audio (WebSocket) | `ws://localhost:4000/audio` |
 | Prometheus metrics | `http://localhost:8686/` |
 
-Video handlers encode with **PyAV** and push to a local **MediaMTX** server over
-RTSP, which re-exposes each stream as RTSP / WebRTC / HLS.
+Video handlers encode with **PyAV** and push to a local **MediaMTX** server over RTSP, which re-exposes each stream as RTSP / WebRTC / HLS.
 
 ## Dependencies and privacy
 
-The `libs/hololens_sensor_streaming` app-local git submodule is declared in the
-HoloGather root `.gitmodules` file. It supplies the `hl2ss` decoder and is
-pinned to a public upstream revision. From the HoloGather root, initialize both
-app dependencies with:
+The `libs/hololens_sensor_streaming` app-local git submodule is declared in the HoloGather root `.gitmodules` file. It supplies the `hl2ss` decoder and is pinned to a public upstream revision. From the HoloGather root, initialize both app dependencies with:
 
 ```bash
 git submodule update --init --recursive
 ```
-
-The upstream `hl2ss` license includes a Commons Clause restriction. Review and
-preserve its license terms; it is a separate dependency and is not covered by
-any license you choose for this repository.
-
-The checked-in configuration contains only loopback addresses and example topic
-names. This application can handle live camera, microphone, GPS, and orientation
-data; do not commit recordings, logs, packet captures, or exported telemetry.
-The map, audio, metrics, and MediaMTX endpoints have no authentication and bind
-to loopback in the checked-in configuration. Keep them local or place them
-behind an access-controlled proxy if you deliberately expose them.
-
-## Docs
-
-[`docs/`](docs) — [architecture](docs/architecture.md),
-[configuration](docs/configurations.md),
-[topic/packet contract](docs/topic-packet-contract.md).
