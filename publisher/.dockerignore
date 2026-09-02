@@ -1,0 +1,26 @@
+# Keep local credentials, recordings, and development artifacts out of build context.
+.git
+.gitmodules
+.env
+.env.*
+*.secret
+*.credentials
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.pcap
+*.pcapng
+*.sqlite
+*.sqlite3
+*.db
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+recordings/
+dataset/
+docs/
+*.bak

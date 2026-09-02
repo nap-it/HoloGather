@@ -1,0 +1,25 @@
+services:
+  basicservice:
+    container_name: basicservice
+    image: ${CABASICSERVICE_IMAGE:-cabasicservice:timetest}
+     # Set CABASICSERVICE_IMAGE to a compatible public/local image.
+    environment:
+      - CORRUPTION_PROTECTION=true
+    volumes:
+      - ./config.ini:/config.ini
+      - ./logs:/logs
+    network_mode: host
+    restart: unless-stopped
+
+  fixedPathAdapter:
+    container_name: fixedPathAdapter
+    image: ${FIXEDPATHADAPTER_IMAGE:-fixedpathadapter:dev}
+    environment:
+      - CORRUPTION_PROTECTION=true
+    volumes:
+      - ./config.ini:/config.ini
+      - ./dynamics.txt:/dynamics.txt
+    network_mode: host
+    depends_on:
+      - basicservice
+    restart: always
