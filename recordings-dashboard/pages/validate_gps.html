@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SafeXCity · GPS Validation</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg:#f1f5f9; --surface:#fff; --border:#e2e8f0; --text:#1e293b;
+    --muted:#64748b; --accent:#2563eb; --run1:#2563eb; --run2:#dc2626;
+    --run3:#16a34a; --phone:#f59e0b; --header-h:52px; --footer-h:118px;
+  }
+  *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    font-size:13px; background:var(--bg); color:var(--text);
+    display:grid; grid-template-rows:var(--header-h) 1fr var(--footer-h);
+    height:100vh; overflow:hidden;
+  }
+  header {
+    background:var(--surface); border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:16px; padding:0 16px;
+  }
+  header h1 { font-size:14px; font-weight:600; white-space:nowrap; }
+  .nav-link {
+    font-size:11px; color:var(--muted); text-decoration:none;
+    padding:3px 10px; border:1px solid var(--border); border-radius:6px;
+  }
+  .nav-link:hover { background:var(--bg); }
+  .nav-link.active { background:var(--accent); color:#fff; border-color:transparent; }
+  .run-btns { display:flex; gap:6px; }
+  .run-btn {
+    padding:4px 14px; border-radius:99px; border:1.5px solid var(--border);
+    background:transparent; cursor:pointer; font-size:12px; font-weight:500;
+    color:var(--muted); transition:all .15s;
+  }
+  .run-btn.active { color:#fff; border-color:transparent; }
+  #run-select {
+    background:var(--panel,#fff); color:inherit; border:1px solid var(--border,#cbd5e1);
+    border-radius:6px; padding:4px 8px; font-size:12px; font-weight:600; cursor:pointer;
+    max-width:260px;
+  }
+  .legend { display:flex; gap:14px; margin-left:auto; align-items:center; }
+  .gps-src-wrap { display:flex; align-items:center; gap:5px; font-size:10px; color:var(--muted); }
+  .gps-src-grp { display:flex; border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+  .gps-src-btn, .hdg-src-btn {
+    padding:3px 9px; border:none; background:transparent; font-size:10px;
+    font-weight:500; cursor:pointer; color:var(--muted);
+  }
+  .gps-src-btn + .gps-src-btn, .hdg-src-btn + .hdg-src-btn { border-left:1px solid var(--border); }
+  .gps-src-btn.active, .hdg-src-btn.active { background:var(--accent); color:#fff; }
+  .hdg-src-btn:disabled { opacity:.4; cursor:not-allowed; }
+
+  main { display:flex; padding:4px; overflow:hidden; }
+  #map { flex:1; border-radius:8px; overflow:hidden; min-width:200px; }
+  #col-divider { width:6px; cursor:ew-resize; flex-shrink:0; position:relative; }
+  #col-divider::after { content:''; position:absolute; inset:2px; background:var(--border); border-radius:3px; }
+  #col-divider:hover::after { background:#94a3b8; }
+  .video-panel { width:460px; min-width:240px; max-width:760px; flex-shrink:0; display:flex; }
+  .video-box {
+    background:#0f172a; border-radius:8px; overflow:hidden; position:relative;
+    flex:1; display:flex; flex-direction:column;
+  }
+  .video-label {
+    position:absolute; top:6px; left:8px; font-size:10px; font-weight:600;
+    letter-spacing:.05em; text-transform:uppercase; color:rgba(255,255,255,.6);
+    z-index:10; pointer-events:none;
+  }
+  video { width:100%; height:100%; object-fit:contain; background:#0f172a; }
+  .head-pose {
+    position:absolute; top:8px; right:8px; z-index:1000; width:104px; padding:5px 6px 4px;
+    background:rgba(15,23,42,.82); border:1px solid #334155; border-radius:8px;
+    text-align:center; backdrop-filter:blur(2px); pointer-events:none;
+  }
+  .hp-title { font-size:8px; letter-spacing:.08em; text-transform:uppercase; color:#94a3b8; }
+  .hp-stage { height:78px; display:flex; align-items:center; justify-content:center; }
+  #hp-head { transition:transform .1s linear; }
+  #hp-face, #hp-chin { transition:all .1s linear; }
+  .hp-read { font-size:9.5px; color:#cbd5e1; margin-top:2px; font-variant-numeric:tabular-nums; }
+  .no-video {
+    display:none; position:absolute; inset:0; z-index:5; background:#0f172a;
+    color:rgba(255,255,255,.35); font-size:11px; line-height:1.7; text-align:center;
+    align-items:center; justify-content:center; flex-direction:column; padding:16px;
+  }
+  .no-video.visible { display:flex; }
+  .no-video code { font-size:10px; opacity:.6; margin-top:6px; display:block; }
+
+  footer {
+    background:var(--surface); border-top:1px solid var(--border);
+    display:flex; flex-direction:column; gap:6px; padding:8px 16px;
+  }
+  .ctrl-row { display:flex; align-items:center; gap:12px; }
+  #play-btn {
+    width:32px; height:32px; border-radius:50%; border:none; background:var(--accent);
+    color:#fff; cursor:pointer; font-size:14px; flex-shrink:0;
+  }
+  #play-btn:hover { opacity:.85; }
+  select { border:1px solid var(--border); border-radius:4px; padding:3px 6px; font-size:12px; cursor:pointer; }
+  .timeline { flex:1; display:flex; flex-direction:column; gap:3px; }
+  input[type=range] { width:100%; accent-color:var(--accent); cursor:pointer; }
+  #scrubber { height:4px; }
+  .time-row { display:flex; justify-content:space-between; font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .live-values { display:flex; gap:14px; align-items:center; flex-shrink:0; }
+  .val-item { display:flex; flex-direction:column; align-items:flex-end; }
+  .val-label { font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+  .val-data { font-size:12px; font-variant-numeric:tabular-nums; font-weight:500; }
+
+  /* Validation controls */
+  .valid-row { display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
+  .valid-grp { display:flex; align-items:center; gap:6px; }
+  .valid-grp > .vg-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  .nudge-btn {
+    border:1px solid var(--border); background:var(--surface); border-radius:4px;
+    padding:2px 7px; font-size:11px; cursor:pointer; font-variant-numeric:tabular-nums;
+    color:var(--text);
+  }
+  .nudge-btn:hover { background:var(--bg); }
+  .vg-value {
+    font-size:12px; font-weight:600; font-variant-numeric:tabular-nums;
+    min-width:54px; text-align:center; color:var(--accent);
+  }
+  .vg-reset { font-size:10px; color:var(--muted); cursor:pointer; text-decoration:underline; }
+  .offset-slider { width:160px; }
+
+  .leaflet-focus-btn {
+    width:30px; height:30px; background:#fff; border:none; cursor:pointer;
+    font-size:16px; line-height:30px; text-align:center; display:block;
+  }
+  .leaflet-focus-btn:hover { background:#f0f0f0; }
+  .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>SafeXCity · GPS Validation</h1>
+  <a class="nav-link active" href="validate_gps.html">GPS ↔ RGB</a>
+  <a class="nav-link" href="validate_depth.html">RGB ↔ Depth</a>
+  <a class="nav-link" href="index.html">All recordings</a>
+  <div class="run-btns">
+    <select id="run-select" aria-label="Select recording" title="recording"></select>
+  </div>
+  <div class="legend">
+    <div class="gps-src-wrap">
+      <span>Marker:</span>
+      <div class="gps-src-grp">
+        <button class="gps-src-btn active" data-src="vam">VAM</button>
+        <button class="gps-src-btn" data-src="phone">Phone</button>
+      </div>
+    </div>
+    <div class="gps-src-wrap">
+      <span>Heading:</span>
+      <div class="gps-src-grp">
+        <button class="hdg-src-btn active" data-hsrc="orig">Original</button>
+        <button class="hdg-src-btn" data-hsrc="corr">Corrected</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div id="map">
+    <!-- Head pose: glasses nod with IMU pitch (down = look down) + tilt with roll -->
+    <div id="head-pose" class="head-pose" hidden>
+      <div class="hp-title">Head pose</div>
+      <div class="hp-stage">
+        <svg id="hp-svg" viewBox="-28 -30 56 62" width="94" height="78">
+          <defs><clipPath id="hp-clip"><circle cx="0" cy="0" r="24"/></clipPath></defs>
+          <g id="hp-head">
+            <circle cx="0" cy="0" r="24" fill="#c7cfdb" stroke="#8b97a8" stroke-width="1.4"/>
+            <ellipse id="hp-chin" cx="0" cy="22" rx="17" ry="0" fill="#aab4c2" clip-path="url(#hp-clip)"/>
+            <g id="hp-face">
+              <g stroke="#38bdf8" stroke-width="2.3" fill="rgba(56,189,248,.3)" stroke-linejoin="round">
+                <rect x="-15" y="-3" width="12.5" height="10" rx="3"/>
+                <rect x="2.5" y="-3" width="12.5" height="10" rx="3"/>
+                <line x1="-2.5" y1="2" x2="2.5" y2="2"/>
+              </g>
+              <path d="M0 8 L-2.5 14 L2.5 14" fill="none" stroke="#7b8494" stroke-width="1.3"/>
+            </g>
+          </g>
+        </svg>
+      </div>
+      <div class="hp-read"><span id="hp-pitch">—</span> pitch · <span id="hp-roll">—</span> roll</div>
+    </div>
+  </div>
+  <div id="col-divider"></div>
+  <div class="video-panel">
+    <div class="video-box">
+      <span class="video-label">RGB Camera</span>
+      <video id="rgb-video" preload="metadata" loop playsinline></video>
+      <div id="rgb-placeholder" class="no-video">
+        No RGB video found.<br><code>validate_recordings.py &lt;run&gt; rgb</code>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <!-- Playback row -->
+  <div class="ctrl-row">
+    <button id="play-btn" title="Play / Pause">▶</button>
+    <label for="speed" class="sr-only">Speed</label>
+    <select id="speed">
+      <option value="0.5">0.5×</option>
+      <option value="1" selected>1×</option>
+      <option value="2">2×</option>
+      <option value="4">4×</option>
+    </select>
+    <div class="timeline">
+      <label for="scrubber" class="sr-only">Timeline</label>
+      <input type="range" id="scrubber" min="0" max="1000" value="0">
+      <div class="time-row">
+        <span id="time-display">00:00 / 00:00</span>
+        <span id="status"></span>
+      </div>
+    </div>
+    <div class="live-values">
+      <div class="val-item"><span class="val-label">Heading</span><span class="val-data" id="v-heading">—°</span></div>
+      <div class="val-item"><span class="val-label">VAM</span><span class="val-data" id="v-vam">—</span></div>
+      <div class="val-item"><span class="val-label">Phone</span><span class="val-data" id="v-phone">—</span></div>
+      <div class="val-item"><span class="val-label">ΔGPS</span><span class="val-data" id="v-delta">—</span></div>
+    </div>
+  </div>
+
+  <!-- Validation controls row -->
+  <div class="valid-row">
+    <div class="valid-grp">
+      <span class="vg-label">Heading offset</span>
+      <button class="nudge-btn" data-hdg="-10">−10</button>
+      <button class="nudge-btn" data-hdg="-5">−5</button>
+      <button class="nudge-btn" data-hdg="-1">−1</button>
+      <span class="vg-value" id="hdg-offset">0°</span>
+      <button class="nudge-btn" data-hdg="1">+1</button>
+      <button class="nudge-btn" data-hdg="5">+5</button>
+      <button class="nudge-btn" data-hdg="10">+10</button>
+      <span class="vg-reset" id="hdg-reset">reset to auto</span>
+      <span class="vg-reset" id="hdg-raw">raw (0°)</span>
+    </div>
+
+    <div class="valid-grp">
+      <span class="vg-label">GPS offset</span>
+      <button class="nudge-btn" data-gpsoff="-1">−1</button>
+      <label for="gps-offset" class="sr-only">RGB to GPS time offset</label>
+      <input type="range" class="offset-slider" id="gps-offset" min="-60" max="60" step="0.1" value="0" aria-label="RGB to GPS time offset">
+      <button class="nudge-btn" data-gpsoff="1">+1</button>
+      <span class="vg-value" id="gps-offset-val">0.0 s</span>
+    </div>
+
+    <div class="valid-grp">
+      <span class="vg-label">GPS rate ×</span>
+      <button class="nudge-btn" data-gpsscale="-0.01">−.01</button>
+      <label for="gps-scale" class="sr-only">GPS time scale</label>
+      <input type="range" class="offset-slider" id="gps-scale" min="0.85" max="1.20" step="0.005" value="1" aria-label="GPS time scale">
+      <button class="nudge-btn" data-gpsscale="0.01">+.01</button>
+      <span class="vg-value" id="gps-scale-val">1.000</span>
+      <span class="vg-reset" id="gps-reset">reset both</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+// Recordings are discovered from data/index.json — nothing here is hardcoded, so
+// a new recording appears simply by re-running extract_dashboard_data.py.
+const PALETTE = ['#2563eb','#dc2626','#16a34a','#9333ea','#0891b2','#ea580c','#7c3aed','#0d9488','#be123c'];
+const colorFor = i => PALETTE[i % PALETTE.length];
+
+// ════════════════════ STATE ════════════════════
+let runIndex=[];          // [{id,label,has_rgb,...}] newest first
+let currentId=null;       // recording id shown by this page (?id=…)
+let runData=null, isPlaying=false, gpsSource='vam';
+let headingSource='orig';  // 'orig' = unity_heading_1.hlp2, 'corr' = _offset.hlp2 (offset baked in)
+let simTime=0, videoBound=false, animFrame=null, lastFrameTs=null;
+let headingManual=null;   // null = use auto offset; number = manual override
+let gpsTimeOffset=0;      // manual GPS↔video time offset (s)
+let gpsTimeScale=1;       // manual GPS time-scale (1 = raw)
+
+// ════════════════════ MAP ════════════════════
+const map = L.map('map', { zoomControl:true });
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+  { subdomains:'abcd', maxZoom:20,
+    attribution:'© OpenStreetMap © CARTO' }).addTo(map);
+
+let vamLine=null, phoneLine=null, marker=null, markerArrow=null;
+
+function headingIcon(deg, color) {
+  return L.divIcon({
+    html:`<svg viewBox="-14 -14 28 28" width="44" height="44" style="transform:rotate(${deg}deg)">
+      <polygon points="0,-11 7,9 0,5 -7,9" fill="${color}" stroke="white" stroke-width="2" stroke-linejoin="round"/></svg>`,
+    className:'', iconAnchor:[22,22],
+  });
+}
+function updateMarker(lat, lon, deg) {
+  if (!marker) return;
+  marker.setLatLng([lat, lon]);
+  if (!markerArrow) { const el=marker.getElement(); markerArrow = el ? el.querySelector('svg') : null; }
+  if (markerArrow) markerArrow.style.transform = `rotate(${deg}deg)`;
+}
+
+const FocusCtrl = L.Control.extend({
+  options:{ position:'bottomleft' },
+  onAdd() {
+    const w=L.DomUtil.create('div','leaflet-bar');
+    const b=L.DomUtil.create('button','leaflet-focus-btn',w);
+    b.innerHTML='⊙'; b.title='Centre on marker [F]';
+    L.DomEvent.on(b,'click',e=>{ L.DomEvent.stop(e); if(marker) map.panTo(marker.getLatLng(),{animate:true,duration:.4}); });
+    return w;
+  }
+});
+new FocusCtrl().addTo(map);
+document.addEventListener('keydown', e => {
+  if ((e.key==='f'||e.key==='F') && marker) map.panTo(marker.getLatLng(),{animate:true,duration:.4});
+});
+
+// ════════════════════ DATA ════════════════════
+function rebaseTimestamps(data) {
+  const off = data.video_offset_s || 0;
+  if (off <= 0) return {...data};
+  const sh = p => +(p-off).toFixed(3);
+  return { ...data,
+    duration: +(data.duration-off).toFixed(2),
+    vam:   data.vam.filter(p=>p[2]>=off).map(([a,o,t])=>[a,o,sh(t)]),
+    phone: data.phone.filter(p=>p[2]>=off).map(([a,o,t])=>[a,o,sh(t)]),
+    hdg:   data.hdg.filter(p=>p[0]>=off).map(([t,h])=>[sh(t),h]),
+    hdg_corr: (data.hdg_corr||[]).filter(p=>p[0]>=off).map(([t,h])=>[sh(t),h]),
+    imu:   (data.imu||[]).filter(p=>p[0]>=off).map(([t,pi,ro])=>[sh(t),pi,ro]),
+  };
+}
+
+// ════════════════════ INTERP ════════════════════
+const lerp=(a,b,t)=>a+(b-a)*t;
+function interpTrack(tr,t){
+  if(!tr||!tr.length) return null;
+  if(t<=tr[0][2]) return {lat:tr[0][0],lon:tr[0][1]};
+  if(t>=tr[tr.length-1][2]){const p=tr[tr.length-1];return {lat:p[0],lon:p[1]};}
+  for(let i=0;i<tr.length-1;i++){const[la,lo,ta]=tr[i],[lb,ob,tb]=tr[i+1];
+    if(t>=ta&&t<=tb){const f=(t-ta)/(tb-ta);return {lat:lerp(la,lb,f),lon:lerp(lo,ob,f)};}}
+  return null;
+}
+function interpHeading(h,t){
+  if(!h||!h.length) return 0;
+  if(t<=h[0][0]) return h[0][1];
+  if(t>=h[h.length-1][0]) return h[h.length-1][1];
+  for(let i=0;i<h.length-1;i++){const[ta,ha]=h[i],[tb,hb]=h[i+1];
+    if(t>=ta&&t<=tb){const f=(t-ta)/(tb-ta);return ha+(((hb-ha+540)%360)-180)*f;}}
+  return 0;
+}
+// IMU pitch/roll at time t → {pitch, roll} (linear; angles already ±180)
+function interpImu(m,t){
+  if(!m||!m.length) return null;
+  if(t<=m[0][0]) return {pitch:m[0][1],roll:m[0][2]};
+  if(t>=m[m.length-1][0]){const p=m[m.length-1];return {pitch:p[1],roll:p[2]};}
+  for(let i=0;i<m.length-1;i++){const a=m[i],b=m[i+1];
+    if(t>=a[0]&&t<=b[0]){const f=(t-a[0])/(b[0]-a[0]);
+      return {pitch:a[1]+(b[1]-a[1])*f, roll:a[2]+(b[2]-a[2])*f};}}
+  return null;
+}
+const _clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+function updateHeadPose(gt){
+  const el=document.getElementById('head-pose');
+  const g=interpImu(runData.imu,gt);
+  if(!g){ el.hidden=true; return; }
+  el.hidden=false;
+  // Round head: roll rotates it; pitch reveals the chin/neck when looking UP and
+  // foreshortens the face features (which sink when looking DOWN).
+  const p=_clamp(g.pitch,-60,60), tU=Math.max(0,-p/60);
+  const c=Math.cos(p*Math.PI/180);
+  document.getElementById('hp-head').setAttribute('transform', `rotate(${(-g.roll).toFixed(1)})`);
+  document.getElementById('hp-chin').setAttribute('ry', (12*tU).toFixed(1));
+  document.getElementById('hp-face').setAttribute(
+    'transform', `translate(0 ${(15*p/60).toFixed(1)}) scale(1 ${_clamp(c,0.4,1).toFixed(2)})`);
+  document.getElementById('hp-pitch').textContent=`${Math.round(g.pitch)}°`;
+  document.getElementById('hp-roll').textContent=`${Math.round(g.roll)}°`;
+}
+function gpsDistM(a1,o1,a2,o2){
+  const R=6371000,dA=(a2-a1)*Math.PI/180,dO=(o2-o1)*Math.PI/180;
+  const x=Math.sin(dA/2)**2+Math.cos(a1*Math.PI/180)*Math.cos(a2*Math.PI/180)*Math.sin(dO/2)**2;
+  return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+}
+
+// ════════════════════ DRAW ════════════════════
+function drawTrajectory(d, color) {
+  if(vamLine) map.removeLayer(vamLine);
+  if(phoneLine) map.removeLayer(phoneLine);
+  if(marker) map.removeLayer(marker);
+  const vamPrim = gpsSource==='vam';
+  if(d.vam.length) vamLine=L.polyline(d.vam.map(p=>[p[0],p[1]]),
+    {color, weight:vamPrim?3:1.5, opacity:vamPrim?.85:.4, dashArray:vamPrim?null:'5 5'}).addTo(map);
+  if(d.phone.length) phoneLine=L.polyline(d.phone.map(p=>[p[0],p[1]]),
+    {color:'#f59e0b', weight:vamPrim?1.5:3, opacity:vamPrim?.4:.85, dashArray:vamPrim?'5 5':null}).addTo(map);
+  const s0 = vamPrim ? d.vam : d.phone;
+  const [la,lo] = s0.length ? [s0[0][0],s0[0][1]] : [0,0];
+  marker = L.marker([la,lo], {icon:headingIcon(0,color), zIndexOffset:1000}).addTo(map);
+  const mel = marker.getElement(); markerArrow = mel ? mel.querySelector('svg') : null;
+
+}
+
+// ════════════════════ UPDATE ════════════════════
+function effectiveHeadingOffset() {
+  // The corrected stream already has the offset baked into the data → show as-is.
+  if (headingSource === 'corr' && runData.hdg_corr && runData.hdg_corr.length) return 0;
+  return headingManual !== null ? headingManual : (runData.heading_offset || 0);
+}
+function activeHeadingTrack() {
+  return (headingSource === 'corr' && runData.hdg_corr && runData.hdg_corr.length)
+    ? runData.hdg_corr : runData.hdg;
+}
+function updateFromTime(t) {
+  if(!runData) return;
+  const dur=runData.duration;
+  t=Math.max(0,Math.min(t,dur));
+  document.getElementById('scrubber').value = t/dur*1000;
+  const fmt=s=>String(Math.floor(s/60)).padStart(2,'0')+':'+String(Math.floor(s%60)).padStart(2,'0');
+  document.getElementById('time-display').textContent = `${fmt(t)} / ${fmt(dur)}`;
+
+  // GPS/heading are sampled at the video time, with optional manual alignment.
+  const gt = Math.max(0, t * gpsTimeScale + gpsTimeOffset);
+  const rawH = interpHeading(activeHeadingTrack(), gt);
+  const hdg = ((rawH + effectiveHeadingOffset())%360+360)%360;
+  document.getElementById('v-heading').textContent = `${Math.round(hdg).toString().padStart(3,'0')}°`;
+
+  const vam=interpTrack(runData.vam,gt), phone=interpTrack(runData.phone,gt);
+  const primary = gpsSource==='vam' ? vam : phone;
+  if(primary) updateMarker(primary.lat, primary.lon, hdg);
+  updateHeadPose(gt);
+
+  // Readout: video time vs the GPS timeline instant being shown.
+  const rgbEl=document.getElementById('rgb-video');
+  document.getElementById('status').textContent =
+    `vid ${(rgbEl.currentTime||0).toFixed(2)}s → GPS@ ${gt.toFixed(2)}s  (Δ ${(t-gt).toFixed(2)}s)`;
+
+  document.getElementById('v-vam').textContent   = vam   ? `${vam.lat.toFixed(5)}, ${vam.lon.toFixed(5)}`   : '—';
+  document.getElementById('v-phone').textContent = phone ? `${phone.lat.toFixed(5)}, ${phone.lon.toFixed(5)}` : '—';
+  document.getElementById('v-delta').textContent = (vam&&phone) ? `${gpsDistM(vam.lat,vam.lon,phone.lat,phone.lon).toFixed(1)} m` : '—';
+}
+
+// ════════════════════ LOAD RUN ════════════════════
+async function loadRun(id) {
+  currentId=id; simTime=0; isPlaying=false; videoBound=false;
+  headingManual=null; gpsTimeOffset=0; gpsTimeScale=1;
+  cancelAnimationFrame(animFrame); animFrame=null;
+  document.getElementById('play-btn').textContent='▶';
+  document.getElementById('gps-offset').value=0;
+  document.getElementById('gps-offset-val').textContent='0.0 s';
+  document.getElementById('gps-scale').value=1;
+  document.getElementById('gps-scale-val').textContent='1.000';
+
+  const rgb=document.getElementById('rgb-video');
+  rgb.ontimeupdate=null; rgb.onloadedmetadata=null; rgb.pause();
+
+  let raw;
+  try{
+    const r=await fetch(`../data/${id}.json`);
+    if(!r.ok) throw new Error(r.status);
+    raw=await r.json();
+  }catch(e){
+    document.getElementById('status').textContent =
+      `data/${id}.json not found — run extract_dashboard_data.py`;
+    return;
+  }
+  const data=rebaseTimestamps(raw); runData=data;
+  const rgbSrc=data.rgb_video||data.rgb||'';
+  const meta=runIndex.find(r=>r.id===id);
+  document.getElementById('status').textContent =
+    (meta?meta.label:id) + (rgbSrc ? '' : ' — no RGB video (run validate_recordings.py)');
+  syncHeadingSourceUI();
+  refreshHeadingDisplay();
+
+  document.getElementById('rgb-placeholder').classList.toggle('visible', !rgbSrc);
+  rgb.style.visibility = rgbSrc ? '' : 'hidden';
+
+  const activeId=id, getSpeed=()=>parseFloat(document.getElementById('speed').value);
+  rgb.onloadedmetadata=()=>{
+    if(currentId!==activeId) return;
+    videoBound=true; rgb.playbackRate=getSpeed();
+    if(isPlaying) rgb.play().catch(()=>{});
+  };
+  rgb.ontimeupdate=()=>{
+    if(currentId!==activeId||!videoBound) return;
+    simTime=rgb.currentTime; updateFromTime(simTime);
+  };
+  // Cache tag — bump when videos are regenerated.
+  if(rgbSrc){ rgb.src=rgbSrc+'?v=1'; rgb.load(); }
+
+  const idx=Math.max(0, runIndex.findIndex(r=>r.id===id));
+  drawTrajectory(data, colorFor(idx));
+  document.getElementById('scrubber').value=0;
+  updateFromTime(0);
+  const pts = data.vam.length ? data.vam : data.phone;
+  if(pts.length) map.fitBounds(L.latLngBounds(pts.map(p=>[p[0],p[1]])).pad(0.15),{animate:true});
+}
+
+// ════════════════════ ANIM FALLBACK (no video) ════════════════════
+function animLoop(ts){
+  if(!isPlaying) return;
+  if(lastFrameTs!==null){
+    simTime += (ts-lastFrameTs)/1000*parseFloat(document.getElementById('speed').value);
+    if(simTime>=runData.duration){ simTime=0; }   // loop
+    updateFromTime(simTime);
+  }
+  lastFrameTs=ts;
+  animFrame=requestAnimationFrame(animLoop);
+}
+
+// ════════════════════ CONTROLS ════════════════════
+function refreshHeadingDisplay(){
+  const v=effectiveHeadingOffset();
+  document.getElementById('hdg-offset').textContent = `${v>0?'+':''}${v.toFixed(0)}°`;
+}
+
+document.getElementById('play-btn').addEventListener('click',()=>{
+  isPlaying=!isPlaying;
+  document.getElementById('play-btn').textContent = isPlaying?'⏸':'▶';
+  const rgb=document.getElementById('rgb-video');
+  if(isPlaying){
+    if(videoBound){ rgb.playbackRate=parseFloat(document.getElementById('speed').value); rgb.play().catch(()=>{}); }
+    else if(!rgb.src){ lastFrameTs=null; animFrame=requestAnimationFrame(animLoop); }
+  } else {
+    rgb.pause(); cancelAnimationFrame(animFrame);
+  }
+});
+document.getElementById('speed').addEventListener('change',e=>{
+  document.getElementById('rgb-video').playbackRate=parseFloat(e.target.value);
+});
+
+let seekTimer=null;
+document.getElementById('scrubber').addEventListener('input',e=>{
+  if(!runData) return;
+  simTime=runData.duration*e.target.value/1000;
+  updateFromTime(simTime);
+  if(videoBound){
+    clearTimeout(seekTimer);
+    seekTimer=setTimeout(()=>{ document.getElementById('rgb-video').currentTime=simTime; },100);
+  }
+});
+
+// Recording picker — switching updates ?id= so every recording has its own URL.
+document.getElementById('run-select').addEventListener('change', e=>{
+  const id=e.target.value;
+  history.replaceState(null,'',`?id=${id}`);
+  loadRun(id);
+});
+document.querySelectorAll('.gps-src-btn').forEach(b=>b.addEventListener('click',()=>{
+  gpsSource=b.dataset.src;
+  document.querySelectorAll('.gps-src-btn').forEach(x=>x.classList.toggle('active',x===b));
+  if(runData){
+    const idx=Math.max(0, runIndex.findIndex(r=>r.id===currentId));
+    drawTrajectory(runData,colorFor(idx)); updateFromTime(simTime);
+  }
+}));
+// Heading data-source switch: original file vs offset-corrected file
+document.querySelectorAll('.hdg-src-btn').forEach(b=>b.addEventListener('click',()=>{
+  if(b.disabled) return;
+  headingSource=b.dataset.hsrc;
+  document.querySelectorAll('.hdg-src-btn').forEach(x=>x.classList.toggle('active',x===b));
+  refreshHeadingDisplay(); updateFromTime(simTime);
+}));
+function syncHeadingSourceUI(){
+  const hasCorr = !!(runData && runData.hdg_corr && runData.hdg_corr.length);
+  const corrBtn = document.querySelector('.hdg-src-btn[data-hsrc="corr"]');
+  const origBtn = document.querySelector('.hdg-src-btn[data-hsrc="orig"]');
+  if(corrBtn){ corrBtn.disabled=!hasCorr; corrBtn.title = hasCorr ? 'offset-corrected heading file' : 'no _offset.hlp2 for this run'; }
+  if(!hasCorr) headingSource='orig';
+  if(corrBtn) corrBtn.classList.toggle('active', headingSource==='corr');
+  if(origBtn) origBtn.classList.toggle('active', headingSource==='orig');
+}
+
+// Heading offset nudge buttons
+document.querySelectorAll('.nudge-btn[data-hdg]').forEach(b=>b.addEventListener('click',()=>{
+  if(headingManual===null) headingManual = (runData.heading_offset||0);
+  headingManual += parseFloat(b.dataset.hdg);
+  refreshHeadingDisplay(); updateFromTime(simTime);
+}));
+document.getElementById('hdg-reset').addEventListener('click',()=>{
+  headingManual=null; refreshHeadingDisplay(); updateFromTime(simTime);
+});
+// View the ORIGINAL, uncorrected sensor heading (no offset applied)
+document.getElementById('hdg-raw').addEventListener('click',()=>{
+  headingManual=0; refreshHeadingDisplay(); updateFromTime(simTime);
+});
+
+// RGB↔GPS time offset — slider, ±1 nudge buttons, reset
+function setGpsOffset(v){
+  gpsTimeOffset = Math.max(-60, Math.min(60, +v.toFixed(1)));
+  document.getElementById('gps-offset').value = gpsTimeOffset;
+  document.getElementById('gps-offset-val').textContent =
+    `${gpsTimeOffset>0?'+':''}${gpsTimeOffset.toFixed(1)} s`;
+  updateFromTime(simTime);
+}
+document.getElementById('gps-offset').addEventListener('input',e=>setGpsOffset(parseFloat(e.target.value)));
+document.querySelectorAll('.nudge-btn[data-gpsoff]').forEach(b=>
+  b.addEventListener('click',()=>setGpsOffset(gpsTimeOffset + parseFloat(b.dataset.gpsoff))));
+
+// GPS rate-scale — manual time-alignment
+function setGpsScale(v){
+  gpsTimeScale = Math.max(0.85, Math.min(1.20, v));
+  document.getElementById('gps-scale').value = gpsTimeScale;
+  document.getElementById('gps-scale-val').textContent = gpsTimeScale.toFixed(3);
+  updateFromTime(simTime);
+}
+document.getElementById('gps-scale').addEventListener('input',e=>setGpsScale(parseFloat(e.target.value)));
+document.querySelectorAll('.nudge-btn[data-gpsscale]').forEach(b=>
+  b.addEventListener('click',()=>setGpsScale(gpsTimeScale + parseFloat(b.dataset.gpsscale))));
+document.getElementById('gps-reset').addEventListener('click',()=>{ setGpsOffset(0); setGpsScale(1); });
+
+// Column divider
+;(function(){
+  const div=document.getElementById('col-divider'); let drag=false,sx,sw;
+  div.addEventListener('mousedown',e=>{drag=true;sx=e.clientX;sw=document.querySelector('.video-panel').offsetWidth;document.body.style.userSelect='none';e.preventDefault();});
+  document.addEventListener('mousemove',e=>{ if(!drag)return; document.querySelector('.video-panel').style.width=`${Math.max(240,Math.min(760,sw-(e.clientX-sx)))}px`; map.invalidateSize(); });
+  document.addEventListener('mouseup',()=>{ drag=false; document.body.style.userSelect=''; });
+})();
+
+// Single-video stall watchdog
+let lastT=-1, stuck=0;
+setInterval(()=>{
+  if(!isPlaying||!videoBound) return;
+  const rgb=document.getElementById('rgb-video');
+  if(!rgb.src||rgb.paused) return;
+  const now=performance.now();
+  if(rgb.currentTime===lastT){
+    if(stuck===0) stuck=now;
+    else if(now-stuck>1200){ rgb.play().catch(()=>{}); if(now-stuck>2800){ rgb.currentTime+=0.001; stuck=now; } }
+  } else { lastT=rgb.currentTime; stuck=0; }
+}, 700);
+
+// ════════════════════ INIT ════════════════════
+// Discover recordings from data/index.json, then show the one named by ?id=
+// (defaulting to the newest). Nothing is hardcoded — new recordings show up as
+// soon as extract_dashboard_data.py has been re-run.
+(async function boot(){
+  const status=document.getElementById('status');
+  try{
+    const r=await fetch('../data/index.json');
+    if(!r.ok) throw new Error(r.status);
+    runIndex=(await r.json()).runs||[];
+  }catch(e){
+    status.textContent='data/index.json not found — run extract_dashboard_data.py';
+    return;
+  }
+  if(!runIndex.length){ status.textContent='no recordings found'; return; }
+
+  const sel=document.getElementById('run-select');
+  sel.innerHTML=runIndex.map(r=>
+    `<option value="${r.id}">${r.label}${r.has_rgb?'':' (no video)'}</option>`).join('');
+
+  const want=new URLSearchParams(location.search).get('id');
+  const id=runIndex.some(r=>r.id===want) ? want : runIndex[0].id;
+  sel.value=id;
+  history.replaceState(null,'',`?id=${id}`);
+  loadRun(id);
+})();
+</script>
+</body>
+</html>

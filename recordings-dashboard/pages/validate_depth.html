@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SafeXCity · Depth Sync Validation</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg:#f1f5f9; --surface:#fff; --border:#e2e8f0; --text:#1e293b;
+    --muted:#64748b; --accent:#2563eb; --run1:#2563eb; --run2:#dc2626;
+    --run3:#16a34a; --header-h:52px; --footer-h:96px;
+  }
+  *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    font-size:13px; background:var(--bg); color:var(--text);
+    display:grid; grid-template-rows:var(--header-h) 1fr var(--footer-h);
+    height:100vh; overflow:hidden;
+  }
+  header { background:var(--surface); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:16px; padding:0 16px; }
+  header h1 { font-size:14px; font-weight:600; white-space:nowrap; }
+  .nav-link { font-size:11px; color:var(--muted); text-decoration:none; padding:3px 10px; border:1px solid var(--border); border-radius:6px; }
+  .nav-link:hover { background:var(--bg); }
+  .nav-link.active { background:var(--accent); color:#fff; border-color:transparent; }
+  .run-btns { display:flex; gap:6px; }
+  .run-btn { padding:4px 14px; border-radius:99px; border:1.5px solid var(--border); background:transparent; cursor:pointer; font-size:12px; font-weight:500; color:var(--muted); }
+  .run-btn.active { color:#fff; border-color:transparent; }
+  #run-select {
+    background:var(--panel,#fff); color:inherit; border:1px solid var(--border,#cbd5e1);
+    border-radius:6px; padding:4px 8px; font-size:12px; font-weight:600; cursor:pointer;
+    max-width:260px;
+  }
+  .layout-toggle { margin-left:auto; display:flex; gap:6px; align-items:center; font-size:10px; color:var(--muted); }
+  .lt-btn { border:1px solid var(--border); background:var(--surface); border-radius:4px; padding:3px 8px; font-size:10px; cursor:pointer; }
+  .lt-btn.active { background:var(--accent); color:#fff; border-color:transparent; }
+
+  main { display:grid; gap:4px; padding:4px; overflow:hidden; }
+  main.side { grid-template-columns:1fr 1fr; grid-template-rows:1fr; }
+  main.stack { grid-template-columns:1fr; grid-template-rows:1fr 1fr; }
+  .video-box { background:#0f172a; border-radius:8px; overflow:hidden; position:relative; display:flex; }
+  .video-label { position:absolute; top:6px; left:8px; font-size:10px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; color:rgba(255,255,255,.6); z-index:10; pointer-events:none; }
+  video { width:100%; height:100%; object-fit:contain; background:#0f172a; }
+  .no-video { display:none; position:absolute; inset:0; z-index:5; background:#0f172a; color:rgba(255,255,255,.35); font-size:11px; align-items:center; justify-content:center; text-align:center; padding:16px; flex-direction:column; }
+  .no-video.visible { display:flex; }
+  .no-video code { font-size:10px; opacity:.6; margin-top:6px; }
+
+  footer { background:var(--surface); border-top:1px solid var(--border); display:flex; flex-direction:column; gap:8px; padding:8px 16px; }
+  .ctrl-row { display:flex; align-items:center; gap:12px; }
+  #play-btn { width:32px; height:32px; border-radius:50%; border:none; background:var(--accent); color:#fff; cursor:pointer; font-size:14px; flex-shrink:0; }
+  #play-btn:hover { opacity:.85; }
+  select { border:1px solid var(--border); border-radius:4px; padding:3px 6px; font-size:12px; cursor:pointer; }
+  .timeline { flex:1; display:flex; flex-direction:column; gap:3px; }
+  input[type=range] { width:100%; accent-color:var(--accent); cursor:pointer; }
+  #scrubber { height:4px; }
+  .time-row { display:flex; justify-content:space-between; font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .step-btn { border:1px solid var(--border); background:var(--surface); border-radius:4px; padding:4px 9px; font-size:12px; cursor:pointer; }
+  .step-btn:hover { background:var(--bg); }
+
+  .valid-row { display:flex; align-items:center; gap:14px; }
+  .vg-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  .nudge-btn { border:1px solid var(--border); background:var(--surface); border-radius:4px; padding:2px 7px; font-size:11px; cursor:pointer; font-variant-numeric:tabular-nums; }
+  .nudge-btn:hover { background:var(--bg); }
+  .vg-value { font-size:12px; font-weight:600; font-variant-numeric:tabular-nums; min-width:78px; text-align:center; color:var(--accent); }
+  .vg-reset { font-size:10px; color:var(--muted); cursor:pointer; text-decoration:underline; }
+  .offset-slider { width:200px; }
+  .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>SafeXCity · Depth Sync</h1>
+  <a class="nav-link" href="validate_gps.html">GPS ↔ RGB</a>
+  <a class="nav-link active" href="validate_depth.html">RGB ↔ Depth</a>
+  <a class="nav-link" href="index.html">All recordings</a>
+  <div class="run-btns">
+    <select id="run-select" aria-label="Select recording" title="recording"></select>
+  </div>
+  <div class="layout-toggle">
+    <span>Layout:</span>
+    <button class="lt-btn active" data-layout="side">Side</button>
+    <button class="lt-btn" data-layout="stack">Stack</button>
+  </div>
+</header>
+
+<main class="side" id="main">
+  <div class="video-box">
+    <span class="video-label">RGB Camera</span>
+    <video id="rgb-video" preload="metadata" loop playsinline></video>
+    <div id="rgb-placeholder" class="no-video">No RGB video.<br><code>validate_recordings.py &lt;run&gt; rgb</code></div>
+  </div>
+  <div class="video-box">
+    <span class="video-label">Depth Camera</span>
+    <video id="depth-video" preload="metadata" loop muted playsinline></video>
+    <div id="depth-placeholder" class="no-video">No depth video.<br><code>validate_recordings.py &lt;run&gt; depth</code></div>
+  </div>
+</main>
+
+<footer>
+  <div class="ctrl-row">
+    <button id="play-btn">▶</button>
+    <label for="speed" class="sr-only">Speed</label>
+    <select id="speed">
+      <option value="0.25">0.25×</option>
+      <option value="0.5">0.5×</option>
+      <option value="1" selected>1×</option>
+      <option value="2">2×</option>
+    </select>
+    <button class="step-btn" id="step-back">⏮ frame</button>
+    <button class="step-btn" id="step-fwd">frame ⏭</button>
+    <div class="timeline">
+      <label for="scrubber" class="sr-only">Timeline</label>
+      <input type="range" id="scrubber" min="0" max="1000" value="0">
+      <div class="time-row"><span id="time-display">00:00 / 00:00</span><span id="status"></span></div>
+    </div>
+  </div>
+
+  <div class="valid-row">
+    <span class="vg-label">Depth offset vs RGB</span>
+    <button class="nudge-btn" data-off="-0.2">−0.2s</button>
+    <button class="nudge-btn" data-off="-0.066">−1 frame</button>
+    <span class="vg-value" id="depth-off">0.000 s</span>
+    <button class="nudge-btn" data-off="0.066">+1 frame</button>
+    <button class="nudge-btn" data-off="0.2">+0.2s</button>
+    <label for="depth-off-slider" class="sr-only">Depth offset</label>
+    <input type="range" class="offset-slider" id="depth-off-slider" min="-2" max="2" step="0.033" value="0" aria-label="Depth offset">
+    <span class="vg-reset" id="depth-off-reset">reset to auto</span>
+    <span class="vg-label" id="sync-note" style="margin-left:auto"></span>
+  </div>
+</footer>
+
+<script>
+const RGB_FPS = 30;   // real-time CFR encode rate of the validation videos (for frame stepping)
+
+// Recordings come from data/index.json — nothing hardcoded (see validate_gps.html).
+let runIndex=[], currentId=null;
+let runData=null, isPlaying=false, videoBound=false;
+let simTime=0, depthOffset=0, autoDepthOffset=0;
+
+const rgb   = () => document.getElementById('rgb-video');
+const depth = () => document.getElementById('depth-video');
+
+// ════════════════════ LOAD RUN ════════════════════
+async function loadRun(id) {
+  currentId=id; simTime=0; isPlaying=false; videoBound=false;
+  document.getElementById('play-btn').textContent='▶';
+  const r=rgb(), d=depth();
+  r.ontimeupdate=null; r.onloadedmetadata=null; r.pause(); d.pause();
+
+  try{
+    const res=await fetch(`../data/${id}.json`);
+    if(!res.ok) throw new Error(res.status);
+    runData=await res.json();
+  }catch(e){
+    document.getElementById('status').textContent =
+      `data/${id}.json not found — run extract_dashboard_data.py`;
+    return;
+  }
+  autoDepthOffset = runData.depth_sync_delta || 0;
+  depthOffset = autoDepthOffset;
+  syncOffsetUI();
+
+  const rgbSrc=runData.rgb_video||'', depthSrc=runData.depth_video||'';
+  const meta=runIndex.find(x=>x.id===id);
+  const missing=[!rgbSrc?'RGB':null, !depthSrc?'depth':null].filter(Boolean).join(' + ');
+  document.getElementById('status').textContent =
+    (meta?meta.label:id) + (missing ? ` — no ${missing} video (run validate_recordings.py)` : '');
+  document.getElementById('rgb-placeholder').classList.toggle('visible', !rgbSrc);
+  document.getElementById('depth-placeholder').classList.toggle('visible', !depthSrc);
+  r.style.visibility = rgbSrc ? '' : 'hidden';
+  d.style.visibility = depthSrc ? '' : 'hidden';
+  d.muted = true;
+
+  const activeId=id, getSpeed=()=>parseFloat(document.getElementById('speed').value);
+  r.onloadedmetadata=()=>{
+    if(currentId!==activeId) return;
+    videoBound=true; r.playbackRate=getSpeed();
+    if(isPlaying) r.play().catch(()=>{});
+  };
+  // Only RGB plays; depth (all-intra, low-res) is seeked to follow it each
+  // frame — a cheap single-frame decode that avoids dual continuous decoding.
+  r.ontimeupdate=()=>{
+    if(currentId!==activeId||!videoBound) return;
+    simTime=r.currentTime;
+    const dur=runData.duration||r.duration||1;
+    document.getElementById('scrubber').value=simTime/dur*1000;
+    const fmt=s=>String(Math.floor(s/60)).padStart(2,'0')+':'+String(Math.floor(s%60)).padStart(2,'0');
+    document.getElementById('time-display').textContent=`${fmt(simTime)} / ${fmt(dur)}`;
+    // Slave depth frame to RGB position (seek, do not play)
+    if(depthSrc && d.readyState>=1){
+      const target=Math.max(0, r.currentTime + depthOffset);
+      if(Math.abs(d.currentTime-target)>0.03) d.currentTime=target;
+    }
+  };
+  // Cache tag — bump when videos are regenerated.
+  const cb='?v=1';
+  if(rgbSrc){ r.src=rgbSrc+cb; r.load(); }
+  if(depthSrc){ d.src=depthSrc+cb; d.load(); } else { d.removeAttribute('src'); }
+}
+
+// ════════════════════ DEPTH OFFSET ════════════════════
+function syncOffsetUI(){
+  document.getElementById('depth-off').textContent=`${depthOffset>0?'+':''}${depthOffset.toFixed(3)} s`;
+  document.getElementById('depth-off-slider').value=Math.max(-2,Math.min(2,depthOffset));
+  document.getElementById('sync-note').textContent =
+    Math.abs(depthOffset-autoDepthOffset)<0.001 ? 'at auto-measured offset' : 'manual offset';
+}
+function applyDepthOffset(){
+  const d=depth();
+  if(d.src && d.readyState>=1){ d.currentTime=Math.max(0, rgb().currentTime + depthOffset); }
+}
+document.querySelectorAll('.nudge-btn[data-off]').forEach(b=>b.addEventListener('click',()=>{
+  depthOffset += parseFloat(b.dataset.off); syncOffsetUI(); applyDepthOffset();
+}));
+document.getElementById('depth-off-slider').addEventListener('input',e=>{
+  depthOffset=parseFloat(e.target.value); syncOffsetUI(); applyDepthOffset();
+});
+document.getElementById('depth-off-reset').addEventListener('click',()=>{
+  depthOffset=autoDepthOffset; syncOffsetUI(); applyDepthOffset();
+});
+
+// ════════════════════ PLAYBACK ════════════════════
+document.getElementById('play-btn').addEventListener('click',()=>{
+  isPlaying=!isPlaying;
+  document.getElementById('play-btn').textContent=isPlaying?'⏸':'▶';
+  const r=rgb();
+  if(isPlaying && videoBound){
+    r.playbackRate=parseFloat(document.getElementById('speed').value);
+    r.play().catch(()=>{});   // only RGB plays; depth follows via ontimeupdate
+  } else {
+    r.pause();
+    depth().pause();
+  }
+});
+document.getElementById('speed').addEventListener('change',e=>{
+  rgb().playbackRate=parseFloat(e.target.value);   // depth is seeked, not played
+});
+
+// Frame step (pauses both, advances by 1 frame, keeps depth aligned)
+function stepFrame(dir){
+  if(isPlaying){ document.getElementById('play-btn').click(); }
+  const r=rgb(), d=depth();
+  r.currentTime = Math.max(0, r.currentTime + dir/RGB_FPS);
+  if(d.src) d.currentTime = Math.max(0, r.currentTime + depthOffset);
+  simTime=r.currentTime;
+}
+document.getElementById('step-fwd').addEventListener('click',()=>stepFrame(1));
+document.getElementById('step-back').addEventListener('click',()=>stepFrame(-1));
+
+let seekTimer=null;
+document.getElementById('scrubber').addEventListener('input',e=>{
+  if(!runData) return;
+  const dur=runData.duration||rgb().duration||1;
+  simTime=dur*e.target.value/1000;
+  const fmt=s=>String(Math.floor(s/60)).padStart(2,'0')+':'+String(Math.floor(s%60)).padStart(2,'0');
+  document.getElementById('time-display').textContent=`${fmt(simTime)} / ${fmt(dur)}`;
+  if(videoBound){
+    clearTimeout(seekTimer);
+    seekTimer=setTimeout(()=>{ rgb().currentTime=simTime; if(depth().src) depth().currentTime=simTime+depthOffset; },100);
+  }
+});
+
+// Recording picker — switching updates ?id= so every recording has its own URL.
+document.getElementById('run-select').addEventListener('change', e=>{
+  const id=e.target.value;
+  history.replaceState(null,'',`?id=${id}`);
+  loadRun(id);
+});
+document.querySelectorAll('.lt-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.lt-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  document.getElementById('main').className=b.dataset.layout;
+}));
+
+// RGB stall recovery only. Depth is never "played" (it follows via seek in
+// ontimeupdate), so there's no depth-loop problem and no dual decode.
+// We do NOT tiny-seek RGB to recover — seeking a large file forces a re-buffer
+// which makes a stall worse. We only re-issue play(), which the browser handles
+// gracefully once enough data is buffered.
+let lastT=-1, stuck=0;
+setInterval(()=>{
+  if(!isPlaying||!videoBound) return;
+  const r=rgb();
+  if(!r.src||r.paused) return;
+  const now=performance.now();
+  if(r.currentTime===lastT){
+    if(stuck===0) stuck=now;
+    else if(now-stuck>1500){ r.play().catch(()=>{}); stuck=now; }   // gentle nudge, no seek
+  } else { lastT=r.currentTime; stuck=0; }
+}, 1000);
+
+// Discover recordings from data/index.json, then show the one named by ?id=
+// (defaulting to the newest). Mirrors validate_gps.html — nothing hardcoded.
+(async function boot(){
+  const status=document.getElementById('status');
+  try{
+    const r=await fetch('../data/index.json');
+    if(!r.ok) throw new Error(r.status);
+    runIndex=(await r.json()).runs||[];
+  }catch(e){
+    status.textContent='data/index.json not found — run extract_dashboard_data.py';
+    return;
+  }
+  if(!runIndex.length){ status.textContent='no recordings found'; return; }
+
+  const sel=document.getElementById('run-select');
+  sel.innerHTML=runIndex.map(r=>
+    `<option value="${r.id}">${r.label}${r.has_depth?'':' (no depth)'}</option>`).join('');
+
+  const want=new URLSearchParams(location.search).get('id');
+  const id=runIndex.some(r=>r.id===want) ? want : runIndex[0].id;
+  sel.value=id;
+  history.replaceState(null,'',`?id=${id}`);
+  loadRun(id);
+})();
+</script>
+</body>
+</html>

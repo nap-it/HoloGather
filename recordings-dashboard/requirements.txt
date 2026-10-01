@@ -1,0 +1,3 @@
+# Only extract_dashboard_data.py needs a dependency (to read the .hlp2 records).
+# serve_dashboard.py and the HTML pages need nothing beyond Python 3.
+msgpack

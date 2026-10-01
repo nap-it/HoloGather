@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SafeXCity · Recordings</title>
+<style>
+  :root{
+    --bg:#f8fafc; --panel:#fff; --border:#e2e8f0; --text:#0f172a;
+    --muted:#64748b; --accent:#2563eb; --ok:#16a34a; --warn:#ea580c;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0b0d10; --panel:#12161c; --border:#232a35; --text:#e5e7eb; --muted:#94a3b8; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+  header{display:flex;align-items:center;gap:14px;padding:14px 22px;
+         border-bottom:1px solid var(--border);background:var(--panel)}
+  h1{font-size:15px;margin:0;font-weight:700}
+  .sub{color:var(--muted);font-size:12px;margin-left:auto}
+  main{padding:22px;max-width:1200px;margin:0 auto}
+  .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;
+        padding:14px;text-decoration:none;color:inherit;display:block;transition:.15s}
+  .card:hover{border-color:var(--accent);transform:translateY(-2px)}
+  .card h2{font-size:14px;margin:0 0 4px;font-weight:700}
+  .id{font-family:ui-monospace,monospace;font-size:11px;color:var(--muted)}
+  .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .tag{font-size:10px;padding:2px 7px;border-radius:999px;border:1px solid var(--border);color:var(--muted)}
+  .tag.on{border-color:var(--ok);color:var(--ok)}
+  .tag.off{border-color:var(--warn);color:var(--warn)}
+  .meta{font-size:11px;color:var(--muted);margin-top:8px}
+  .empty{color:var(--muted);font-size:13px;padding:40px;text-align:center}
+  code{background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:11px}
+</style>
+</head>
+<body>
+<header>
+  <h1>SafeXCity · Recordings</h1>
+  <span class="sub" id="sub">loading…</span>
+</header>
+<main>
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty" hidden></div>
+</main>
+<script>
+// Fully data-driven: every card comes from data/index.json, which the extractor
+// regenerates. Adding a recording = copy it + re-run extract_dashboard_data.py.
+const fmtDur = s => `${Math.floor(s/60)}m ${String(Math.round(s%60)).padStart(2,'0')}s`;
+
+(async function(){
+  const grid=document.getElementById('grid'), empty=document.getElementById('empty');
+  let idx;
+  try{
+    const r=await fetch('../data/index.json');
+    if(!r.ok) throw new Error(r.status);
+    idx=await r.json();
+  }catch(e){
+    document.getElementById('sub').textContent='';
+    empty.hidden=false;
+    empty.innerHTML='<b>data/index.json not found.</b><br>Run <code>python3 scripts/extract_dashboard_data.py</code> to generate it.';
+    return;
+  }
+  const runs=idx.runs||[];
+  document.getElementById('sub').textContent =
+    `${runs.length} recording(s) · generated ${idx.generated||''}`;
+  if(!runs.length){ empty.hidden=false; empty.textContent='No recordings found.'; return; }
+
+  grid.innerHTML = runs.map(r=>`
+    <a class="card" href="validate_gps.html?id=${r.id}">
+      <h2>${r.label}</h2>
+      <div class="id">${r.id}</div>
+      <div class="row">
+        <span class="tag ${r.has_rgb?'on':'off'}">${r.has_rgb?'RGB':'no RGB'}</span>
+        <span class="tag ${r.has_depth?'on':'off'}">${r.has_depth?'depth':'no depth'}</span>
+        ${r.has_hdg_corr?'<span class="tag on">hdg corrected</span>':''}
+      </div>
+      <div class="meta">
+        ${fmtDur(r.duration)} · vam ${r.counts.vam} · phone ${r.counts.phone} · hdg ${r.counts.hdg}
+      </div>
+    </a>`).join('');
+})();
+</script>
+</body>
+</html>

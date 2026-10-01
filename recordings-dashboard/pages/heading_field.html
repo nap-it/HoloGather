@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SafeXCity · Heading Field</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="icon" href="data:,">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:13px;
+       display:grid;grid-template-rows:52px 1fr;height:100vh;overflow:hidden;color:#1e293b}
+  header{background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:16px;padding:0 16px}
+  header h1{font-size:14px;font-weight:600;white-space:nowrap}
+  .nav-link{font-size:11px;color:#64748b;text-decoration:none;padding:3px 10px;border:1px solid #e2e8f0;border-radius:6px}
+  .nav-link:hover{background:#f1f5f9}
+  .grp{display:flex;gap:6px;align-items:center}
+  .grp .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#64748b}
+  button.opt{padding:4px 12px;border-radius:99px;border:1.5px solid #e2e8f0;background:transparent;
+             cursor:pointer;font-size:12px;font-weight:500;color:#64748b}
+  button.opt.active{background:#2563eb;color:#fff;border-color:transparent}
+  .sl{display:flex;align-items:center;gap:6px;font-size:11px;color:#64748b}
+  input[type=range]{accent-color:#2563eb;cursor:pointer}
+  #map{height:100%}
+  .arrow svg{filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))}
+  .info{margin-left:auto;font-size:11px;color:#64748b;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<header>
+  <h1>SafeXCity · Heading Field</h1>
+  <a class="nav-link" href="validate_gps.html">GPS ↔ RGB</a>
+  <a class="nav-link" href="validate_depth.html">RGB ↔ Depth</a>
+  <a class="nav-link" href="index.html">All recordings</a>
+  <div class="grp"><span class="lbl">Recording</span>
+    <select id="run-select" aria-label="Select recording"></select>
+  </div>
+  <div class="grp"><span class="lbl">Source</span>
+    <button class="opt active" data-src="vam">VAM</button>
+    <button class="opt" data-src="phone">Phone</button>
+  </div>
+  <div class="grp"><span class="lbl">Offset</span>
+    <button class="opt active" data-off="auto">Auto</button>
+    <button class="opt" data-off="raw">Raw (0°)</button>
+  </div>
+  <div class="sl"><span>Every</span>
+    <input type="range" id="density" min="1" max="20" value="5">
+    <span id="density-val">5</span><span>pts</span>
+  </div>
+  <div class="info" id="info"></div>
+</header>
+<div id="map"></div>
+
+<script>
+const PALETTE=['#2563eb','#dc2626','#16a34a','#9333ea','#0891b2','#ea580c','#7c3aed','#0d9488','#be123c'];
+let runIndex=[], currentId=null, source='vam', offsetMode='auto', everyN=5;
+let runData=null, layer=null;
+
+const map=L.map('map',{zoomControl:true});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+  {subdomains:'abcd',maxZoom:20,attribution:'© OpenStreetMap © CARTO'}).addTo(map);
+
+function interpHeading(h,t){
+  if(!h||!h.length) return 0;
+  if(t<=h[0][0]) return h[0][1];
+  if(t>=h[h.length-1][0]) return h[h.length-1][1];
+  for(let i=0;i<h.length-1;i++){const[ta,ha]=h[i],[tb,hb]=h[i+1];
+    if(t>=ta&&t<=tb){const f=(t-ta)/(tb-ta);return ha+(((hb-ha+540)%360)-180)*f;}}
+  return 0;
+}
+
+function arrowIcon(deg,color){
+  return L.divIcon({
+    className:'',
+    html:`<svg class="arrow" viewBox="-12 -12 24 24" width="30" height="30" style="transform:rotate(${deg}deg)">
+      <line x1="0" y1="8" x2="0" y2="-6" stroke="${color}" stroke-width="2.5"/>
+      <polygon points="0,-11 5,-3 -5,-3" fill="${color}"/>
+    </svg>`,
+    iconAnchor:[15,15],
+  });
+}
+
+function draw(){
+  if(layer) map.removeLayer(layer);
+  layer=L.layerGroup().addTo(map);
+  const color=PALETTE[Math.max(0,runIndex.findIndex(r=>r.id===currentId))%PALETTE.length];
+  const track = source==='vam' ? runData.vam : runData.phone;
+  const off = offsetMode==='auto' ? (runData.heading_offset||0) : 0;
+  if(!track || !track.length){ document.getElementById('info').textContent='no GPS for this source'; return; }
+
+  // faint connecting line for context
+  L.polyline(track.map(p=>[p[0],p[1]]),{color,weight:1,opacity:.25}).addTo(layer);
+
+  let n=0;
+  for(let i=0;i<track.length;i+=everyN){
+    const [lat,lon,t]=track[i];
+    const hdg=((interpHeading(runData.hdg,t)+off)%360+360)%360;
+    L.marker([lat,lon],{icon:arrowIcon(hdg,color),interactive:false}).addTo(layer);
+    n++;
+  }
+  document.getElementById('info').textContent =
+    `${n} arrows · source ${source} · offset ${offsetMode==='auto'?(off>0?'+':'')+off.toFixed(0)+'°':'0°'}`;
+
+  const pts=track.map(p=>[p[0],p[1]]);
+  map.fitBounds(L.latLngBounds(pts).pad(0.1));
+}
+
+async function loadRun(id){
+  currentId=id;
+  try{ const r=await fetch(`../data/${id}.json`); runData=r.ok?await r.json():null; }
+  catch{ runData=null; }
+  if(runData) draw();
+}
+
+document.getElementById('run-select').addEventListener('change',e=>{
+  history.replaceState(null,'',`?id=${e.target.value}`); loadRun(e.target.value);
+});
+document.querySelectorAll('[data-src]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('[data-src]').forEach(x=>x.classList.toggle('active',x===b));
+  source=b.dataset.src; if(runData) draw();
+}));
+document.querySelectorAll('[data-off]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('[data-off]').forEach(x=>x.classList.toggle('active',x===b));
+  offsetMode=b.dataset.off; if(runData) draw();
+}));
+document.getElementById('density').addEventListener('input',e=>{
+  everyN=parseInt(e.target.value);
+  document.getElementById('density-val').textContent=everyN;
+  if(runData) draw();
+});
+
+(async function boot(){
+  try{ runIndex=(await (await fetch('../data/index.json')).json()).runs||[]; }
+  catch{ document.getElementById('info').textContent='data/index.json not found — run extract_dashboard_data.py'; return; }
+  if(!runIndex.length){ document.getElementById('info').textContent='no recordings found'; return; }
+  const sel=document.getElementById('run-select');
+  sel.innerHTML=runIndex.map(r=>`<option value="${r.id}">${r.label}</option>`).join('');
+  const want=new URLSearchParams(location.search).get('id');
+  const id=runIndex.some(r=>r.id===want)?want:runIndex[0].id;
+  sel.value=id; history.replaceState(null,'',`?id=${id}`); loadRun(id);
+})();
+</script>
+</body>
+</html>

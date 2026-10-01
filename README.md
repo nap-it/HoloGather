@@ -8,6 +8,7 @@ HoloGather is an end-to-end toolkit for gathering, recording, replaying, and con
 |---|---|---|
 | `publisher/` | Captures HoloLens and MQTT inputs, records `.hlp2` streams, publishes to Zenoh, and replays recorded sessions | [Publisher README](publisher/README.md) |
 | `subscriber-examples/` | Decodes Zenoh streams and exposes video, audio, positioning, orientation, and metrics outputs | [Subscriber README](subscriber-examples/README.md) |
+| `recordings-dashboard/` | Reviews recorded RGB, depth, GPS, and heading data to check recording quality and stream alignment | [Recordings dashboard README](recordings-dashboard/README.md) |
 | `publisher/libs/hololens_sensor_streaming/` | App-local `hl2ss` capture dependency | Managed by the root `.gitmodules` |
 | `subscriber-examples/libs/hololens_sensor_streaming/` | App-local `hl2ss` decoding dependency | Managed by the root `.gitmodules` |
 
@@ -110,6 +111,29 @@ cd subscriber-examples
 The first run builds the application image and downloads the pinned MediaMTX image. Start-up order is not strict, but starting the publisher first makes it easier to confirm that data is arriving immediately.
 
 To stop either stack, run `docker compose down` from its application directory.
+
+## Review recordings
+
+The recordings dashboard helps check that GPS and heading follow the RGB video
+and that RGB and depth are synchronized. It runs locally and reads recording
+files from a configured directory; video files are not copied into the
+repository.
+
+See the [dashboard README](recordings-dashboard/README.md) for the recording
+layout and setup instructions. In brief, set `recordings_path` in
+`recordings-dashboard/config.json`, install the dashboard's Python dependency,
+then build its index and start the server:
+
+```bash
+cd recordings-dashboard
+python3 -m pip install -r requirements.txt
+python3 scripts/extract_dashboard_data.py
+python3 scripts/serve_dashboard.py
+```
+
+Open <http://localhost:8080/pages/index.html> in a browser. The extractor writes derived
+recording data to `recordings-dashboard/data/`; review that data before
+committing it, since GPS traces and other recording metadata may be sensitive.
 
 ## Default subscriber outputs
 

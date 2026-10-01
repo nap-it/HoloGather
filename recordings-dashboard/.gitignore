@@ -1,0 +1,13 @@
+# Recordings + generated videos live outside the repo (see config.json).
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
